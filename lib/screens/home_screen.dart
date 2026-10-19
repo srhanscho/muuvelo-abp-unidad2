@@ -100,11 +100,12 @@ class _BrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(16)),
-          child: const Icon(Icons.local_drink_rounded, color: AppColors.gold, size: 32),
+        // The logo PNG already includes its purple rounded background.
+        Image.asset(
+          'assets/images/logo.png',
+          width: 60,
+          height: 60,
+          semanticLabel: 'Logo de Muuvelo',
         ),
         const SizedBox(width: 14),
         const Expanded(
