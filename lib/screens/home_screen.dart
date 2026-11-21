@@ -80,7 +80,11 @@ class HomeScreen extends StatelessWidget {
                 GroupedRow(
                   leading: const IconTile(icon: Icon(CupertinoIcons.square_stack_3d_up_fill), color: AppColors.tabVacas),
                   title: 'Mis vacas',
-                  subtitle: Text('${controller.vacas.length} guardadas en tu cuenta'),
+                  subtitle: Text(
+                    controller.vacas.length == 1
+                        ? '1 guardada en tu cuenta'
+                        : '${controller.vacas.length} guardadas en tu cuenta',
+                  ),
                   onTap: onOpenList,
                 ),
                 GroupedRow(

@@ -31,6 +31,7 @@ class VacaSyncController extends ChangeNotifier {
   Object? _error;
   DateTime? _lastSync;
   Future<void>? _running;
+  Future<void>? _queued;
   VoidCallback? _stopWatching;
   Timer? _debounce;
 
@@ -79,9 +80,22 @@ class VacaSyncController extends ChangeNotifier {
     return null;
   }
 
-  /// Re-reads everything from the database. If a refresh is already
-  /// running, callers wait for that one instead of starting another.
-  Future<void> refresh() => _running ??= _doRefresh().whenComplete(() => _running = null);
+  /// Re-reads everything from the database.
+  ///
+  /// If a refresh is already running, that read may have started before the
+  /// caller's write landed (e.g. Realtime fires halfway through a save), so
+  /// reusing it could hand back stale data. Instead one more refresh is
+  /// queued after it; every caller arriving meanwhile shares that queued one.
+  Future<void> refresh() {
+    final running = _running;
+    if (running != null) {
+      return _queued ??= running.then((_) {
+        _queued = null;
+        return refresh();
+      });
+    }
+    return _running = _doRefresh().whenComplete(() => _running = null);
+  }
 
   Future<void> _doRefresh() async {
     _isSyncing = true;
@@ -133,6 +147,8 @@ class VacaSyncController extends ChangeNotifier {
     // Remove it at once so the list does not flash the deleted vaca.
     _vacas = _vacas.where((v) => v.id != id).toList();
     notifyListeners();
-    await refresh();
+    // Re-sync in the background: the delete is already done, and making the
+    // caller wait here kept the Detalle open on "Esta vaca ya no existe".
+    unawaited(refresh());
   }
 }

@@ -14,13 +14,16 @@ String describeLastSync(DateTime? last, DateTime now) {
   return 'Sincronizado el ${last.day} ${_months[last.month - 1]}';
 }
 
+/// Non-breaking space: keeps "3:05 p. m." together when the text wraps.
+const _nbsp = ' ';
+
 /// "20 nov 2026, 3:05 p. m." (local time).
 String formatDateTime(DateTime date) {
   final local = date.toLocal();
   final hour12 = local.hour % 12 == 0 ? 12 : local.hour % 12;
   final minutes = local.minute.toString().padLeft(2, '0');
-  final period = local.hour < 12 ? 'a. m.' : 'p. m.';
-  return '${local.day} ${_months[local.month - 1]} ${local.year}, $hour12:$minutes $period';
+  final period = local.hour < 12 ? 'a.${_nbsp}m.' : 'p.${_nbsp}m.';
+  return '${local.day} ${_months[local.month - 1]} ${local.year}, $hour12:$minutes$_nbsp$period';
 }
 
 /// "Hoy", "Ayer" or "1 nov". Used in the list of vacas.

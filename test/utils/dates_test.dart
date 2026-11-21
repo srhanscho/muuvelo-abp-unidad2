@@ -27,13 +27,20 @@ void main() {
   });
 
   group('formatDateTime', () {
+    // The time uses non-breaking spaces ( ) so "p. m." never wraps
+    // onto its own line.
     test('afternoon uses 12h clock with p. m.', () {
-      expect(formatDateTime(DateTime(2026, 11, 20, 15, 5)), '20 nov 2026, 3:05 p. m.');
+      expect(formatDateTime(DateTime(2026, 11, 20, 15, 5)), '20 nov 2026, 3:05 p. m.');
     });
 
     test('midnight and noon', () {
-      expect(formatDateTime(DateTime(2026, 1, 2, 0, 0)), '2 ene 2026, 12:00 a. m.');
-      expect(formatDateTime(DateTime(2026, 1, 2, 12, 0)), '2 ene 2026, 12:00 p. m.');
+      expect(formatDateTime(DateTime(2026, 1, 2, 0, 0)), '2 ene 2026, 12:00 a. m.');
+      expect(formatDateTime(DateTime(2026, 1, 2, 12, 0)), '2 ene 2026, 12:00 p. m.');
+    });
+
+    test('the time and its period cannot be split by a line break', () {
+      final text = formatDateTime(DateTime(2026, 11, 20, 17, 16));
+      expect(text.substring(text.indexOf('5:16')), isNot(contains(' ')));
     });
   });
 

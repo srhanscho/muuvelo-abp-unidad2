@@ -172,6 +172,9 @@ class _VacaFormState extends State<VacaForm> {
   // ---- Items ----
 
   Future<void> _addItem() async {
+    // Drop focus first, otherwise the sheet restores it to the last text
+    // field on close and the keyboard pops up over the list.
+    FocusManager.instance.primaryFocus?.unfocus();
     final result = await showItemSheet(context);
     if (result == null) return; // cancelled
     setState(() => _items.add(BillItem(id: _newId('i'), description: result.description, price: result.price)));
@@ -179,6 +182,7 @@ class _VacaFormState extends State<VacaForm> {
 
   Future<void> _editItem(int index) async {
     final item = _items[index];
+    FocusManager.instance.primaryFocus?.unfocus();
     final result = await showItemSheet(context, description: item.description, price: item.price);
     if (result == null) return;
     setState(() => _items[index] = item.copyWith(description: result.description, price: result.price));
@@ -341,7 +345,9 @@ class _VacaFormState extends State<VacaForm> {
           SummaryCard(
             header: 'Vista previa',
             title: restaurant.isEmpty ? 'Tu vaca' : restaurant,
-            subtitle: '${_participants.length} personas · ${_items.length} ítems',
+            subtitle:
+                '${_participants.length} ${_participants.length == 1 ? 'persona' : 'personas'} · '
+                '${_items.length} ${_items.length == 1 ? 'ítem' : 'ítems'}',
             subtotal: preview.subtotal,
             tip: preview.tip,
             tipPercent: _effectiveTip,

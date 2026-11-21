@@ -38,6 +38,7 @@ class VacaLoader extends StatefulWidget {
 
 class _VacaLoaderState extends State<VacaLoader> {
   Vaca? _fetched;
+  Vaca? _lastSeen;
   Object? _error;
   bool _loading = false;
 
@@ -75,7 +76,16 @@ class _VacaLoaderState extends State<VacaLoader> {
       builder: (context, _) {
         // The synced list wins; _fetched only covers a vaca not listed yet.
         final vaca = widget.controller.byId(widget.vacaId) ?? _fetched;
-        if (vaca != null) return widget.builder(context, vaca);
+        if (vaca != null) {
+          _lastSeen = vaca;
+          return widget.builder(context, vaca);
+        }
+        // Deleted from this screen: it is sliding away, keep painting the
+        // last version instead of flashing "Esta vaca ya no existe".
+        final lastSeen = _lastSeen;
+        if (lastSeen != null && !(ModalRoute.of(context)?.isCurrent ?? true)) {
+          return widget.builder(context, lastSeen);
+        }
         if (_loading) {
           return _placeholder(
             const Padding(padding: EdgeInsets.all(48), child: CupertinoActivityIndicator(radius: 14)),

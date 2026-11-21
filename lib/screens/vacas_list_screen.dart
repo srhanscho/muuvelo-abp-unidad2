@@ -29,6 +29,9 @@ class VacasListScreen extends StatefulWidget {
 }
 
 class _VacasListScreenState extends State<VacasListScreen> {
+  /// Below this width the three filter segments cannot be laid out.
+  static const double _minFilterWidth = 120;
+
   VacaFilter _filter = VacaFilter.all;
   String _query = '';
 
@@ -73,17 +76,24 @@ class _VacasListScreenState extends State<VacasListScreen> {
               onChanged: (value) => setState(() => _query = value),
             ),
             const SizedBox(height: Space.m),
-            SizedBox(
-              width: double.infinity,
-              child: CupertinoSlidingSegmentedControl<VacaFilter>(
-                groupValue: _filter,
-                onValueChanged: (value) => setState(() => _filter = value ?? VacaFilter.all),
-                children: const {
-                  VacaFilter.all: _Segment('Todas'),
-                  VacaFilter.open: _Segment('Abiertas'),
-                  VacaFilter.closed: _Segment('Cerradas'),
-                },
-              ),
+            // Android can lay out the first frame with a 0-wide window; the
+            // segmented control then computes negative segment widths, throws
+            // and never recovers. Skip it until there is room for it.
+            LayoutBuilder(
+              builder: (context, constraints) => constraints.maxWidth < _minFilterWidth
+                  ? const SizedBox(width: double.infinity)
+                  : SizedBox(
+                      width: double.infinity,
+                      child: CupertinoSlidingSegmentedControl<VacaFilter>(
+                        groupValue: _filter,
+                        onValueChanged: (value) => setState(() => _filter = value ?? VacaFilter.all),
+                        children: const {
+                          VacaFilter.all: _Segment('Todas'),
+                          VacaFilter.open: _Segment('Abiertas'),
+                          VacaFilter.closed: _Segment('Cerradas'),
+                        },
+                      ),
+                    ),
             ),
             const SizedBox(height: Space.xl),
             ..._content(context, visible),

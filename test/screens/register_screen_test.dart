@@ -8,6 +8,10 @@ import '../fakes.dart';
 
 Finder field(String label) => find.widgetWithText(CustomTextField, label);
 
+/// The text field that currently holds keyboard focus, if any.
+EditableText? focusedTextField() =>
+    FocusManager.instance.primaryFocus?.context?.findAncestorWidgetOfExactType<EditableText>();
+
 void main() {
   late FakeVacaRepository repository;
 
@@ -66,6 +70,34 @@ void main() {
 
     expect(find.text('ana ya está en la mesa'), findsOneWidget);
     expect(find.byTooltip('Quitar a Ana'), findsOneWidget);
+  });
+
+  Future<void> addItem(WidgetTester tester, String description, String price) async {
+    await tapVisible(tester, find.text('Agregar ítem'));
+    await tester.enterText(field('Descripción'), description);
+    await tester.enterText(field('Precio en pesos'), price);
+    await tester.tap(find.widgetWithText(FilledButton, 'Agregar'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('closing the item sheet does not re-focus the person field', (tester) async {
+    await openRegister(tester);
+    await addPerson(tester, 'Ana'); // leaves the person field focused
+    await tester.showKeyboard(field('Nombre de la persona'));
+    expect(focusedTextField(), isNotNull);
+
+    await addItem(tester, 'Postre', '10000');
+
+    expect(focusedTextField(), isNull);
+  });
+
+  testWidgets('the preview subtitle uses singular for one item', (tester) async {
+    await openRegister(tester);
+    await addPerson(tester, 'Ana');
+    await addItem(tester, 'Postre', '10000');
+
+    expect(find.text('1 personas · 1 ítems'), findsNothing);
+    expect(find.text('1 persona · 1 ítem'), findsOneWidget);
   });
 
   testWidgets('happy path: the vaca is saved in the repository and the success state appears', (tester) async {

@@ -49,7 +49,8 @@ class PersonShareCard extends StatelessWidget {
       // Remove the default divider lines of the ExpansionTile.
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
-        tilePadding: const EdgeInsets.only(left: Space.l, right: Space.s),
+        // Same right inset as the other grouped rows, so the amounts line up.
+        tilePadding: const EdgeInsets.symmetric(horizontal: Space.l),
         childrenPadding: const EdgeInsets.fromLTRB(64, 0, Space.l, Space.m),
         shape: const Border(),
         collapsedShape: const Border(),
