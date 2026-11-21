@@ -7,6 +7,10 @@ enum SignUpOutcome {
 
   /// The project asks to confirm the email first: no session yet.
   needsEmailConfirmation,
+
+  /// The email already has an account: no email is sent, the user should
+  /// log in instead.
+  alreadyRegistered,
 }
 
 /// Authentication contract. Screens depend on this, not on Supabase, so
@@ -51,7 +55,12 @@ class SupabaseAuthService implements AuthService {
   @override
   Future<SignUpOutcome> signUp({required String email, required String password}) async {
     final response = await _auth.signUp(email: email.trim(), password: password);
-    return response.session == null ? SignUpOutcome.needsEmailConfirmation : SignUpOutcome.signedIn;
+    if (response.session != null) return SignUpOutcome.signedIn;
+    // To avoid revealing which emails are registered, Supabase answers a
+    // repeated sign-up "successfully" but with a user that has no
+    // identities, and sends no email. We detect that case to guide the user.
+    if (response.user?.identities?.isEmpty ?? false) return SignUpOutcome.alreadyRegistered;
+    return SignUpOutcome.needsEmailConfirmation;
   }
 
   @override

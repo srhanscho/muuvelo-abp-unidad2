@@ -86,6 +86,21 @@ void main() {
     expect(find.textContaining('Te enviamos un correo para confirmar tu cuenta'), findsOneWidget);
   });
 
+  testWidgets('sign up with an email that already has an account says so', (tester) async {
+    auth.signUpOutcome = SignUpOutcome.alreadyRegistered;
+    await pumpLogin(tester);
+
+    await tester.tap(find.text('¿No tienes cuenta? Crear cuenta'));
+    await tester.pumpAndSettle();
+    await tester.enterText(field('Correo electrónico'), 'ya@existe.com');
+    await tester.enterText(field('Contraseña'), 'secreta1');
+    await tester.tap(find.widgetWithText(FilledButton, 'Crear cuenta'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Ya existe una cuenta con este correo'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Iniciar sesión'), findsOneWidget);
+  });
+
   testWidgets('auth gate: the app is only reachable after logging in', (tester) async {
     usePhoneSize(tester);
     await tester.pumpWidget(MuuveloApp(auth: auth, createRepository: FakeVacaRepository.new));

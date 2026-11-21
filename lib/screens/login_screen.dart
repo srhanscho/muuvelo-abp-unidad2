@@ -63,9 +63,15 @@ class _LoginScreenState extends State<LoginScreen> {
       final password = _passwordController.text;
       if (_signUpMode) {
         final outcome = await widget.auth.signUp(email: email, password: password);
-        if (outcome == SignUpOutcome.needsEmailConfirmation && mounted) {
+        if (!mounted) return;
+        if (outcome == SignUpOutcome.needsEmailConfirmation) {
           setState(() {
             _info = 'Te enviamos un correo para confirmar tu cuenta. Ábrelo y luego inicia sesión.';
+            _signUpMode = false;
+          });
+        } else if (outcome == SignUpOutcome.alreadyRegistered) {
+          setState(() {
+            _error = 'Ya existe una cuenta con este correo. Inicia sesión con tu contraseña.';
             _signUpMode = false;
           });
         }
