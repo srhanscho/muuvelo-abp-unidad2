@@ -64,7 +64,12 @@ class _MuuveloAppState extends State<MuuveloApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     if (_signedIn) _startSession();
     _authSubscription = widget.auth.signedInChanges.listen((signedIn) {
-      if (signedIn == _signedIn) return; // e.g. token refreshed
+      if (signedIn == _signedIn) {
+        // Same user, new token (Supabase renews it every hour). If the app
+        // opened with an expired token, the first read failed: read again.
+        if (signedIn && _controller?.state == SyncState.error) _controller!.refresh();
+        return;
+      }
       setState(() {
         _signedIn = signedIn;
         signedIn ? _startSession() : _endSession();

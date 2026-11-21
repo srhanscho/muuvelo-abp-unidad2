@@ -54,6 +54,9 @@ class FakeAuthService implements AuthService {
 
   @override
   Future<void> signOut() async => _set(false);
+
+  /// Supabase renewed the access token: same user, still signed in.
+  void emitTokenRefreshed() => _changes.add(_signedIn);
 }
 
 /// In-memory "database" with the same JSON shape Supabase returns, so the

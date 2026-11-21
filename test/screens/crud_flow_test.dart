@@ -47,6 +47,17 @@ class SlowReadsRepository extends FakeVacaRepository {
   }
 }
 
+/// Reads fail (like a 401 with an expired token) until [tokenValid].
+class ExpiredTokenRepository extends FakeVacaRepository {
+  bool tokenValid = false;
+
+  @override
+  Future<List<Vaca>> fetchVacas() async {
+    if (!tokenValid) throw Exception('JWT expired');
+    return super.fetchVacas();
+  }
+}
+
 /// Consulta -> Detalle -> Edición -> Eliminación, with the in-memory
 /// repository standing in for Supabase.
 void main() {
@@ -89,6 +100,24 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('Todas'), findsOneWidget);
+    expect(find.text('La Fonda del Parque'), findsWidgets);
+  });
+
+  testWidgets('a cold start with an expired token re-syncs once the token is refreshed', (tester) async {
+    // On launch the stored token may be expired: the first read fails (401)
+    // and Supabase renews the token a moment later. The app must retry then.
+    usePhoneSize(tester);
+    final expired = ExpiredTokenRepository()..seed();
+    final auth = FakeAuthService(signedIn: true);
+    await tester.pumpWidget(MuuveloApp(auth: auth, createRepository: () => expired));
+    await tester.pumpAndSettle();
+    expect(find.text('Sin sincronizar · Reintentar'), findsOneWidget);
+
+    expired.tokenValid = true;
+    auth.emitTokenRefreshed();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sin sincronizar · Reintentar'), findsNothing);
     expect(find.text('La Fonda del Parque'), findsWidgets);
   });
 
