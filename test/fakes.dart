@@ -61,6 +61,18 @@ class FakeAuthService implements AuthService {
 class FakeVacaRepository implements VacaRepository {
   final Map<String, Map<String, dynamic>> rows = {};
   int _next = 0;
+  VoidCallback? _listener;
+
+  bool get isWatching => _listener != null;
+
+  /// Simulates Supabase Realtime telling the app that a row changed.
+  void emitChange() => _listener?.call();
+
+  @override
+  VoidCallback watchChanges(VoidCallback onChange) {
+    _listener = onChange;
+    return () => _listener = null;
+  }
 
   Map<String, dynamic> _rowFrom(String id, VacaDraft draft, {String status = 'abierta'}) {
     final people = draft.participantRows(id);

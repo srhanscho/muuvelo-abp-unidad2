@@ -74,7 +74,9 @@ class _MuuveloAppState extends State<MuuveloApp> with WidgetsBindingObserver {
 
   void _startSession() {
     _controller?.dispose();
-    _controller = VacaSyncController(widget.createRepository())..refresh();
+    _controller = VacaSyncController(widget.createRepository())
+      ..refresh()
+      ..startRealtime();
   }
 
   void _endSession() {

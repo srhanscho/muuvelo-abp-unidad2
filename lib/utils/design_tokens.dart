@@ -37,8 +37,9 @@ abstract final class Radii {
 /// iOS type scale. Money always uses [money] / [moneyHero] (tabular
 /// figures so digits line up).
 abstract final class AppText {
-  /// Set to 'Inter' once the font files are bundled (see README).
-  static const String? family = null;
+  /// Inter (open-source, SIL OFL) is bundled in assets/fonts/. Apple's SF Pro
+  /// may only be used on Apple platforms, so Inter gives a similar look here.
+  static const String family = 'Inter';
 
   static const _tabular = [FontFeature.tabularFigures()];
 

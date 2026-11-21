@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/vaca.dart';
@@ -29,6 +31,25 @@ class VacaSyncController extends ChangeNotifier {
   Object? _error;
   DateTime? _lastSync;
   Future<void>? _running;
+  VoidCallback? _stopWatching;
+  Timer? _debounce;
+
+  /// DB -> app in real time: when the database reports a change, re-read the
+  /// list. One save writes several rows, so we wait a moment (debounce) and
+  /// refresh once instead of once per row.
+  void startRealtime() {
+    _stopWatching ??= _repository.watchChanges(() {
+      _debounce?.cancel();
+      _debounce = Timer(const Duration(milliseconds: 400), refresh);
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _stopWatching?.call();
+    super.dispose();
+  }
 
   List<Vaca> get vacas => _vacas;
 

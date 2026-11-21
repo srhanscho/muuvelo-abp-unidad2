@@ -62,6 +62,21 @@ void main() {
     expect(controller.byId(id)!.restaurantName, 'Café Tostao');
   });
 
+  test('a realtime change from the database refreshes the list by itself', () async {
+    final repository = FakeVacaRepository();
+    final id = repository.seed();
+    final controller = VacaSyncController(repository)..startRealtime();
+    await controller.refresh();
+
+    repository.rows[id]!['restaurant_name'] = 'Salón Bogotá';
+    repository.emitChange();
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+
+    expect(controller.byId(id)!.restaurantName, 'Salón Bogotá');
+    controller.dispose();
+    expect(repository.isWatching, isFalse);
+  });
+
   test('mutations go to the repository and the list is re-read', () async {
     final repository = FakeVacaRepository();
     final id = repository.seed();

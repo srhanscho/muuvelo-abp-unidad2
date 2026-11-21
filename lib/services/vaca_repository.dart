@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/vaca.dart';
@@ -27,6 +28,11 @@ abstract class VacaRepository {
   Future<void> closeVaca(String id);
 
   Future<void> deleteVaca(String id);
+
+  /// Calls [onChange] whenever this user's vacas or participants change in
+  /// the database (from this phone, another one, or the dashboard).
+  /// Returns a function that stops listening.
+  VoidCallback watchChanges(VoidCallback onChange);
 }
 
 /// The ONLY class in the app that talks to the Supabase database.
@@ -137,5 +143,28 @@ class SupabaseVacaRepository implements VacaRepository {
   Future<void> deleteVaca(String id) async {
     // Participants, items and shares disappear too (ON DELETE CASCADE).
     await _client.from(_vacas).delete().eq('id', id).timeout(_timeout);
+  }
+
+  /// Supabase Realtime: the database pushes a message over a WebSocket on
+  /// every INSERT / UPDATE / DELETE. Realtime applies the same RLS policies,
+  /// so a user only hears about their own rows.
+  @override
+  VoidCallback watchChanges(VoidCallback onChange) {
+    final channel = _client
+        .channel('muuvelo-changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: _vacas,
+          callback: (_) => onChange(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: _participantes,
+          callback: (_) => onChange(),
+        )
+        .subscribe();
+    return () => _client.removeChannel(channel);
   }
 }
