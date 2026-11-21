@@ -1,24 +1,22 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../models/participant.dart';
 import '../utils/constants.dart';
+import '../utils/design_tokens.dart';
 import 'money_text.dart';
-import 'status_chip.dart';
+import 'muuvelo_icon.dart';
 
-/// BillItemCard: one item of the bill with a [FilterChip] per person to
-/// choose who shared it.
+/// BillItemCard: one item of the bill with a toggle pill per person to
+/// choose who shared it. Lives inside a grouped section.
 ///
 /// Parameters:
 /// - [description] / [price]: the item (price in pesos).
-/// - [people]: everyone at the table (one chip each).
-/// - [selectedIds]: who shared the item (selected chips).
-/// - [onToggle]: called with a person's id when their chip is tapped.
-/// - [onDelete]: removes the item.
-/// - [showError]: paints the "Sin asignar" warning in red after the user
-///   tried to calculate.
-///
-/// Used in: RegisterScreen, once per item (unassigned / single owner /
-/// shared configurations).
+/// - [people]: everyone at the table (one pill each).
+/// - [selectedIds]: who shared the item.
+/// - [onToggle]: called with a person's id when their pill is tapped.
+/// - [onEdit] / [onDelete]: change or remove the item.
+/// - [showError]: paints "Sin asignar" in red after a failed submit.
 class BillItemCard extends StatelessWidget {
   const BillItemCard({
     super.key,
@@ -27,6 +25,7 @@ class BillItemCard extends StatelessWidget {
     required this.people,
     required this.selectedIds,
     required this.onToggle,
+    required this.onEdit,
     required this.onDelete,
     this.showError = false,
   });
@@ -36,78 +35,108 @@ class BillItemCard extends StatelessWidget {
   final List<Participant> people;
   final List<String> selectedIds;
   final ValueChanged<String> onToggle;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
   final bool showError;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 6, 4, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    description,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                MoneyText(price, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                IconButton(
-                  tooltip: 'Eliminar $description',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: onDelete,
-                ),
-              ],
-            ),
-            _ShareStatus(count: selectedIds.length, showError: showError),
-            const SizedBox(height: 6),
-            if (people.isEmpty)
-              const Text('Agrega personas para asignar este ítem', style: TextStyle(color: AppColors.muted)),
-            Wrap(
-              spacing: 6,
-              runSpacing: 2,
+    final count = selectedIds.length;
+    final (String status, Color statusColor) = count == 0
+        ? ('Sin asignar: toca quién lo consumió', showError ? AppColors.error : AppColors.pending)
+        : (count == 1 ? 'De una persona' : 'Compartido entre $count · 1/$count cada uno', AppColors.muted);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Space.l, Space.s, Space.xs, Space.m),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(description, style: AppText.headline, overflow: TextOverflow.ellipsis),
+              ),
+              MoneyText(price, style: AppText.money),
+              IconButton(
+                tooltip: 'Editar $description',
+                icon: const MuuveloIcon('edit', size: 20, fallback: CupertinoIcons.pencil, color: AppColors.primary),
+                onPressed: onEdit,
+              ),
+              IconButton(
+                tooltip: 'Eliminar $description',
+                icon: const Icon(CupertinoIcons.trash, size: 20, color: AppColors.error),
+                onPressed: onDelete,
+              ),
+            ],
+          ),
+          Text(status, style: AppText.footnote.copyWith(color: statusColor)),
+          const SizedBox(height: Space.s),
+          if (people.isEmpty) const Text('Agrega personas para asignar este ítem', style: AppText.footnote),
+          Padding(
+            padding: const EdgeInsets.only(right: Space.m),
+            child: Wrap(
+              spacing: Space.s,
+              runSpacing: Space.s,
               children: [
                 for (final person in people)
-                  FilterChip(
-                    label: Text(person.name),
+                  SharerPill(
+                    name: person.name,
                     selected: selectedIds.contains(person.id),
-                    onSelected: (_) => onToggle(person.id),
+                    onTap: () => onToggle(person.id),
                   ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// "Sin asignar" (red after a failed submit), "De una persona" or
-/// "Compartido entre N".
-class _ShareStatus extends StatelessWidget {
-  const _ShareStatus({required this.count, required this.showError});
+/// Toggle pill with a person's name (selected = tinted with a check).
+class SharerPill extends StatelessWidget {
+  const SharerPill({super.key, required this.name, required this.selected, required this.onTap});
 
-  final int count;
-  final bool showError;
+  final String name;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    if (count == 0) {
-      return StatusChip(
-        label: 'Sin asignar: toca quién lo consumió',
-        color: showError ? AppColors.error : AppColors.pending,
-        background: showError ? const Color(0xFFFEE2E2) : AppColors.pendingSoft,
-      );
-    }
-    return StatusChip(
-      label: count == 1 ? 'De una persona' : 'Compartido entre $count',
-      color: AppColors.primary,
-      background: AppColors.primarySoft,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: name,
+      child: Material(
+        color: selected ? AppColors.primary : AppColors.fill,
+        borderRadius: Radii.smallAll,
+        child: InkWell(
+          borderRadius: Radii.smallAll,
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 36),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Space.m, vertical: Space.s),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (selected) ...[
+                    const Icon(CupertinoIcons.checkmark_alt, size: 16, color: Colors.white),
+                    const SizedBox(width: Space.xs),
+                  ],
+                  Text(
+                    name,
+                    style: AppText.subheadline.copyWith(
+                      color: selected ? Colors.white : AppColors.ink,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

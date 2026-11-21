@@ -77,3 +77,19 @@ String? validateItems(List<BillItem> items) {
   }
   return null;
 }
+
+String? validateEmail(String? value) {
+  final text = value?.trim() ?? '';
+  if (text.isEmpty) return 'Escribe tu correo';
+  if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(text)) return 'Revisa que el correo esté bien escrito';
+  return null;
+}
+
+String? validatePassword(String? value) {
+  final text = value ?? '';
+  if (text.isEmpty) return 'Escribe tu contraseña';
+  if (text.length < Limits.minPasswordLength) {
+    return 'Usa al menos ${Limits.minPasswordLength} caracteres';
+  }
+  return null;
+}

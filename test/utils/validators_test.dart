@@ -103,4 +103,21 @@ void main() {
       );
     });
   });
+
+  group('validateEmail', () {
+    test('is required and must look like an email', () {
+      expect(validateEmail(''), isNotNull);
+      expect(validateEmail('ana'), isNotNull);
+      expect(validateEmail('ana@correo'), isNotNull);
+      expect(validateEmail(' ana@correo.com '), isNull);
+    });
+  });
+
+  group('validatePassword', () {
+    test('is required and needs 6 characters', () {
+      expect(validatePassword(''), isNotNull);
+      expect(validatePassword('12345'), isNotNull);
+      expect(validatePassword('123456'), isNull);
+    });
+  });
 }

@@ -1,5 +1,5 @@
 name: muuvelo_abp
-description: "Muuvelo ABP: in-memory bill splitter (university assignment)."
+description: "Muuvelo ABP: bill splitter with Supabase auth and sync (university assignment)."
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -7,8 +7,11 @@ environment:
   sdk: ^3.13.1
 
 dependencies:
+  cupertino_icons: ^2.0.0
   flutter:
     sdk: flutter
+  share_plus: ^13.3.1
+  supabase_flutter: ^2.18.3
 
 dev_dependencies:
   flutter_test:
@@ -19,3 +22,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/logo.png
+    # Custom illustrations; MuuveloIcon falls back to an icon until they exist.
+    - assets/icons/

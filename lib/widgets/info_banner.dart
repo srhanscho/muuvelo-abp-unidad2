@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../utils/constants.dart';
+import '../utils/design_tokens.dart';
 
 /// InfoBanner: soft colored box with an icon and a short explanation.
 ///
 /// Parameters:
-/// - [icon] / [title] / [message]: content.
-/// - [color]: accent for the icon and title; [background] for the box.
+/// - [icon]: any widget (Icon or MuuveloIcon).
+/// - [title] / [message]: content.
+/// - [color]: accent for the title; [background] for the box.
 ///
-/// Used in: HomeScreen (explains the problem, and the empty list) and
-/// ResultsScreen (the "cuenta cerrada" state).
+/// Used in: Edición (paid people warning), Gestión (closed state), Inicio.
 class InfoBanner extends StatelessWidget {
   const InfoBanner({
     super.key,
@@ -20,7 +21,7 @@ class InfoBanner extends StatelessWidget {
     this.background = AppColors.primarySoft,
   });
 
-  final IconData icon;
+  final Widget icon;
   final String title;
   final String message;
   final Color color;
@@ -30,23 +31,20 @@ class InfoBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(16)),
+      padding: const EdgeInsets.all(Space.l),
+      decoration: BoxDecoration(color: background, borderRadius: Radii.largeAll),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color),
-          const SizedBox(width: 12),
+          IconTheme(data: IconThemeData(color: color, size: 22), child: icon),
+          const SizedBox(width: Space.m),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: TextStyle(color: color, fontWeight: FontWeight.w700),
-                ),
+                Text(title, style: AppText.headline.copyWith(color: color)),
                 const SizedBox(height: 2),
-                Text(message, style: const TextStyle(color: AppColors.ink, height: 1.3)),
+                Text(message, style: AppText.subheadline.copyWith(color: AppColors.ink, height: 1.3)),
               ],
             ),
           ),

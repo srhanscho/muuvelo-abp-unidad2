@@ -1,18 +1,19 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 import '../utils/constants.dart';
+import '../utils/design_tokens.dart';
+import 'grouped_section.dart';
 
-/// TipSelector: [Switch] to include the tip, [ChoiceChip]s with the usual
-/// percentages and a [Slider] for a custom value (0 to 30 %).
+/// TipSelector: [CupertinoSwitch] to include the tip, a
+/// [CupertinoSlidingSegmentedControl] with the usual percentages and a
+/// [CupertinoSlider] for a custom value (0 to 30 %).
 ///
 /// Parameters:
 /// - [enabled]: whether a tip is included.
 /// - [percent]: selected percentage.
-/// - [presets]: chip values (e.g. 10, 15, 20).
+/// - [presets]: segment values (e.g. 10, 15, 20).
 /// - [maxPercent]: right end of the slider.
 /// - [onEnabledChanged] / [onPercentChanged]: report changes to the screen.
-///
-/// Used in: RegisterScreen.
 class TipSelector extends StatelessWidget {
   const TipSelector({
     super.key,
@@ -33,69 +34,75 @@ class TipSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SwitchListTile(
-              title: const Text('Incluir propina', style: TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text(enabled ? 'Se reparte según lo que consumió cada uno' : 'Sin propina'),
+    // -1 = "Otra" (custom value from the slider).
+    final segment = presets.contains(percent) ? percent : -1;
+    return GroupedSection(
+      header: 'Propina',
+      footer: enabled ? 'Se reparte según lo que consumió cada uno.' : 'Sin propina.',
+      children: [
+        GroupedRow(
+          title: 'Incluir propina',
+          trailing: Semantics(
+            label: 'Incluir propina',
+            child: CupertinoSwitch(
               value: enabled,
+              activeTrackColor: AppColors.primary,
               onChanged: onEnabledChanged,
             ),
-            // AnimatedSize makes the chips and slider appear smoothly.
-            AnimatedSize(
-              duration: const Duration(milliseconds: 200),
-              child: enabled ? _TipControls(this) : const SizedBox(width: double.infinity),
-            ),
-          ],
+          ),
         ),
-      ),
+        if (enabled)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Space.l, Space.m, Space.l, Space.s),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: CupertinoSlidingSegmentedControl<int>(
+                    groupValue: segment,
+                    onValueChanged: (value) {
+                      if (value != null && value >= 0) onPercentChanged(value);
+                    },
+                    children: {
+                      for (final value in presets) value: _Segment('$value%'),
+                      -1: _Segment(segment == -1 ? '$percent%' : 'Otra'),
+                    },
+                  ),
+                ),
+                const SizedBox(height: Space.m),
+                Row(
+                  children: [
+                    const Text('0%', style: AppText.caption),
+                    Expanded(
+                      child: CupertinoSlider(
+                        min: 0,
+                        max: maxPercent.toDouble(),
+                        divisions: maxPercent, // one step per whole percent
+                        value: percent.toDouble(),
+                        activeColor: AppColors.primary,
+                        onChanged: (value) => onPercentChanged(value.round()),
+                      ),
+                    ),
+                    Text('$maxPercent%', style: AppText.caption),
+                  ],
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
 
-class _TipControls extends StatelessWidget {
-  const _TipControls(this.parent);
+class _Segment extends StatelessWidget {
+  const _Segment(this.text);
 
-  final TipSelector parent;
+  final String text;
 
   @override
-  Widget build(BuildContext context) {
-    final isCustom = !parent.presets.contains(parent.percent);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 8,
-            children: [
-              for (final value in parent.presets)
-                ChoiceChip(
-                  label: Text('$value%'),
-                  selected: parent.percent == value,
-                  onSelected: (_) => parent.onPercentChanged(value),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            isCustom ? 'Personalizada: ${parent.percent}%' : 'O ajusta con la barra: ${parent.percent}%',
-            style: const TextStyle(color: AppColors.muted),
-          ),
-          Slider(
-            min: 0,
-            max: parent.maxPercent.toDouble(),
-            divisions: parent.maxPercent, // one step per whole percent
-            value: parent.percent.toDouble(),
-            label: '${parent.percent}%',
-            onChanged: (value) => parent.onPercentChanged(value.round()),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: Space.s),
+    child: Text(text, style: AppText.subheadline.copyWith(color: AppColors.ink, fontWeight: FontWeight.w600)),
+  );
 }

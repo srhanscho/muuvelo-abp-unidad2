@@ -1,85 +1,74 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:muuvelo_abp/models/bill_item.dart';
-import 'package:muuvelo_abp/models/participant.dart';
-import 'package:muuvelo_abp/models/vaca.dart';
 import 'package:muuvelo_abp/screens/results_screen.dart';
-import 'package:muuvelo_abp/services/split_service.dart';
-import 'package:muuvelo_abp/services/vaca_store.dart';
+import 'package:muuvelo_abp/screens/success_screen.dart';
+import 'package:muuvelo_abp/services/vaca_sync_controller.dart';
+import 'package:muuvelo_abp/utils/constants.dart';
 
-/// A vaca where Ana and Beto each owe $ 10.000 (no tip).
-Vaca sampleVaca(VacaStore store) {
-  const people = [Participant(id: 'ana', name: 'Ana'), Participant(id: 'beto', name: 'Beto')];
-  final items = [
-    const BillItem(id: '1', description: 'Bandeja', price: 10000, sharedBy: ['ana']),
-    const BillItem(id: '2', description: 'Churrasco', price: 10000, sharedBy: ['beto']),
-  ];
-  return Vaca(
-    id: store.nextId(),
-    restaurantName: 'La Fonda',
-    participants: people,
-    hostId: 'ana',
-    items: items,
-    tipPercent: 0,
-    result: calculateSplit(participants: people, items: items, hostId: 'ana', tipPercent: 0),
-  );
-}
-
-Future<void> tapVisible(WidgetTester tester, Finder finder) async {
-  // ListView builds lazily: scroll until the widget exists, then show it.
-  await tester.scrollUntilVisible(finder, 200, scrollable: find.byType(Scrollable).first);
-  await tester.ensureVisible(finder);
-  await tester.pumpAndSettle();
-  await tester.tap(finder);
-  await tester.pumpAndSettle();
-}
+import '../fakes.dart';
 
 void main() {
-  late VacaStore store;
-  late Vaca vaca;
+  late FakeVacaRepository repository;
+  late VacaSyncController controller;
+  late String vacaId;
 
-  setUp(() {
-    store = VacaStore();
-    vaca = sampleVaca(store);
-    store.add(vaca);
+  setUp(() async {
+    repository = FakeVacaRepository();
+    vacaId = repository.seed(); // Ana and Beto owe $ 10.000 each
+    controller = VacaSyncController(repository);
+    await controller.refresh();
   });
 
   Future<void> pumpResults(WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1080, 2340);
-    tester.view.devicePixelRatio = 3;
-    addTearDown(tester.view.reset);
+    usePhoneSize(tester);
     await tester.pumpWidget(
       MaterialApp(
-        home: ResultsScreen(store: store, vacaId: vaca.id),
+        home: ResultsScreen(controller: controller, vacaId: vacaId),
+        onGenerateRoute: (settings) => MaterialPageRoute(
+          builder: (_) => settings.name == Routes.success
+              ? SuccessScreen(controller: controller, args: settings.arguments as SuccessArgs)
+              : const SizedBox(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
   }
 
-  testWidgets('marking someone as paid updates the percentage', (tester) async {
+  testWidgets('shows what is still missing next to what was collected', (tester) async {
     await pumpResults(tester);
     expect(find.text('0%'), findsOneWidget);
+    expect(find.text(r'Faltan $ 20.000 por cobrar'), findsOneWidget);
+  });
 
-    await tapVisible(tester, find.byType(Checkbox).first);
+  testWidgets('marking someone as paid is saved and the glass fills', (tester) async {
+    await pumpResults(tester);
+
+    await tester.tap(find.byType(CupertinoSwitch).first);
+    await tester.pumpAndSettle();
 
     expect(find.text('50%'), findsOneWidget);
     expect(find.text(r'Ana pagó $ 10.000'), findsOneWidget); // SnackBar
-    expect(vaca.collected, 10000);
+    expect(find.text(r'Faltan $ 10.000 por cobrar'), findsOneWidget);
+    final saved = await repository.fetchVaca(vacaId);
+    expect(saved.participants.first.paid, isTrue);
+    expect(saved.participants.first.paidAt, isNotNull);
   });
 
-  testWidgets('closing incomplete asks for confirmation and locks the vaca', (tester) async {
+  testWidgets('closing incomplete asks for confirmation and persists the state', (tester) async {
     await pumpResults(tester);
 
-    await tapVisible(tester, find.text('Cerrar cuenta'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Cerrar cuenta'));
+    await tester.pumpAndSettle();
     expect(find.text('¿Cerrar la cuenta?'), findsOneWidget);
     expect(find.textContaining('Ana, Beto'), findsOneWidget);
 
     await tester.tap(find.text('Cerrar igual'));
     await tester.pumpAndSettle();
 
-    expect(vaca.isClosed, isTrue);
-    expect(find.text('La vaca quedó cerrada'), findsOneWidget);
-    final checkbox = tester.widget<Checkbox>(find.byType(Checkbox).first);
-    expect(checkbox.onChanged, isNull);
+    expect(find.text('¡Cuenta cerrada!'), findsOneWidget);
+    final saved = await repository.fetchVaca(vacaId);
+    expect(saved.isClosed, isTrue);
+    expect(saved.closedAt, isNotNull);
   });
 }

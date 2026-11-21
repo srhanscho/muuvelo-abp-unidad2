@@ -1,57 +1,55 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muuvelo_abp/main.dart';
-import 'package:muuvelo_abp/services/vaca_store.dart';
-import 'package:muuvelo_abp/utils/constants.dart';
+import 'package:muuvelo_abp/widgets/bill_item_card.dart';
+import 'package:muuvelo_abp/widgets/custom_text_field.dart';
 
-/// Phone-like viewport (360 x 780 logical pixels).
-void usePhoneSize(WidgetTester tester) {
-  tester.view.physicalSize = const Size(1080, 2340);
-  tester.view.devicePixelRatio = 3;
-  addTearDown(tester.view.reset);
-}
+import '../fakes.dart';
 
-Future<void> tapVisible(WidgetTester tester, Finder finder) async {
-  // ListView builds lazily: scroll until the widget exists, then show it.
-  await tester.scrollUntilVisible(finder, 200, scrollable: find.byType(Scrollable).first);
-  await tester.ensureVisible(finder);
-  await tester.pumpAndSettle();
-  await tester.tap(finder);
-  await tester.pumpAndSettle();
-}
-
-Finder field(String label) => find.widgetWithText(TextFormField, label);
+Finder field(String label) => find.widgetWithText(CustomTextField, label);
 
 void main() {
-  testWidgets('submitting the empty form shows the errors', (tester) async {
+  late FakeVacaRepository repository;
+
+  /// Logged-in app, then "Nueva" in the tab bar opens Registro.
+  Future<void> openRegister(WidgetTester tester) async {
     usePhoneSize(tester);
-    final store = VacaStore();
-    await tester.pumpWidget(MuuveloApp(store: store, initialRoute: Routes.register));
+    repository = FakeVacaRepository();
+    await tester.pumpWidget(
+      MuuveloApp(auth: FakeAuthService(signedIn: true), createRepository: () => repository),
+    );
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Nueva'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nueva vaca'), findsWidgets);
+  }
 
-    await tapVisible(tester, find.text('Calcular reparto'));
+  Future<void> submit(WidgetTester tester) async {
+    await tester.tap(find.widgetWithText(FilledButton, 'Calcular y guardar'));
+    await tester.pumpAndSettle();
+  }
 
-    // SnackBar with the first problem found.
+  Future<void> addPerson(WidgetTester tester, String name) async {
+    await tester.enterText(field('Nombre de la persona'), name);
+    await tester.tap(find.byTooltip('Agregar persona'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('submitting the empty form shows the errors and saves nothing', (tester) async {
+    await openRegister(tester);
+
+    await submit(tester);
+
     expect(find.widgetWithText(SnackBar, 'Escribe el nombre del restaurante'), findsOneWidget);
-    expect(find.text('Agrega al menos un ítem de la cuenta'), findsOneWidget);
-
-    // Back to the top: inline errors under the fields.
-    await tester.drag(find.byType(SingleChildScrollView).first, const Offset(0, 3000));
-    await tester.pumpAndSettle();
     expect(find.text('Escribe el nombre del restaurante'), findsNWidgets(2)); // field + SnackBar
     expect(find.text('Agrega al menos 2 personas'), findsOneWidget);
-    expect(store.isEmpty, isTrue);
+    expect(repository.rows, isEmpty);
   });
 
   testWidgets('a field error disappears once the user fixes it', (tester) async {
-    usePhoneSize(tester);
-    await tester.pumpWidget(MuuveloApp(store: VacaStore(), initialRoute: Routes.register));
-    await tester.pumpAndSettle();
-
-    await tapVisible(tester, find.text('Calcular reparto'));
-    await tester.drag(find.byType(SingleChildScrollView).first, const Offset(0, 3000));
-    await tester.pumpAndSettle();
-    ScaffoldMessenger.of(tester.element(find.byType(Scaffold))).removeCurrentSnackBar();
+    await openRegister(tester);
+    await submit(tester);
+    ScaffoldMessenger.of(tester.element(find.byType(Scaffold).last)).removeCurrentSnackBar();
     await tester.pumpAndSettle();
     expect(find.text('Escribe el nombre del restaurante'), findsOneWidget);
 
@@ -61,35 +59,24 @@ void main() {
   });
 
   testWidgets('blocks duplicated participant names', (tester) async {
-    usePhoneSize(tester);
-    await tester.pumpWidget(MuuveloApp(store: VacaStore(), initialRoute: Routes.register));
-    await tester.pumpAndSettle();
+    await openRegister(tester);
 
-    for (final name in ['Ana', 'ana']) {
-      await tester.enterText(field('Nombre de la persona'), name);
-      await tester.tap(find.byTooltip('Agregar persona'));
-      await tester.pumpAndSettle();
-    }
+    await addPerson(tester, 'Ana');
+    await addPerson(tester, 'ana');
 
     expect(find.text('ana ya está en la mesa'), findsOneWidget);
-    expect(find.byType(InputChip), findsOneWidget);
+    expect(find.byTooltip('Quitar a Ana'), findsOneWidget);
   });
 
-  testWidgets('happy path: fill the form and land on the results', (tester) async {
-    usePhoneSize(tester);
-    final store = VacaStore();
-    await tester.pumpWidget(MuuveloApp(store: store, initialRoute: Routes.register));
-    await tester.pumpAndSettle();
+  testWidgets('happy path: the vaca is saved in the repository and the success state appears', (tester) async {
+    await openRegister(tester);
 
     await tester.enterText(field('Nombre del restaurante'), 'La Fonda');
-
     for (final name in ['Ana', 'Beto', 'Caro']) {
-      await tester.enterText(field('Nombre de la persona'), name);
-      await tester.tap(find.byTooltip('Agregar persona'));
-      await tester.pumpAndSettle();
+      await addPerson(tester, name);
     }
 
-    // Add one item through the dialog.
+    // Add one item through the bottom sheet.
     await tapVisible(tester, find.text('Agregar ítem'));
     await tester.enterText(field('Descripción'), 'Postre');
     await tester.enterText(field('Precio en pesos'), '10000');
@@ -98,19 +85,21 @@ void main() {
 
     // Shared by the three of them.
     for (final name in ['Ana', 'Beto', 'Caro']) {
-      await tapVisible(tester, find.widgetWithText(FilterChip, name));
+      await tapVisible(tester, find.widgetWithText(SharerPill, name));
     }
 
     // Live preview: 10% default tip on $ 10.000.
     expect(find.text(r'$ 11.000'), findsOneWidget);
 
-    await tapVisible(tester, find.text('Calcular reparto'));
+    await submit(tester);
 
-    expect(find.text('Resultados'), findsOneWidget);
-    expect(find.text('La Fonda'), findsOneWidget);
-    final vaca = store.latest!;
-    expect(vaca.total, 11000);
+    expect(find.text('¡Vaca guardada!'), findsOneWidget);
+    expect(find.text('Compartir resumen'), findsOneWidget);
+    expect(repository.rows, hasLength(1));
+    final saved = await repository.fetchVacas();
+    expect(saved.single.restaurantName, 'La Fonda');
+    expect(saved.single.total, 11000);
     // Ana is the host (first added) and absorbs the residue.
-    expect(vaca.result.amounts.values.reduce((a, b) => a + b), 11000);
+    expect(saved.single.participants.map((p) => p.amount), [3668, 3666, 3666]);
   });
 }

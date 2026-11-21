@@ -1,129 +1,234 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../services/vaca_store.dart';
+import '../models/vaca.dart';
+import '../services/vaca_sync_controller.dart';
 import '../utils/constants.dart';
-import '../widgets/action_card.dart';
-import '../widgets/info_banner.dart';
-import '../widgets/section_header.dart';
+import '../utils/dates.dart';
+import '../utils/design_tokens.dart';
+import '../widgets/grouped_section.dart';
+import '../widgets/large_title_page.dart';
+import '../widgets/money_text.dart';
+import '../widgets/muuvelo_icon.dart';
+import '../widgets/state_views.dart';
+import '../widgets/sync_status_badge.dart';
 import '../widgets/vaca_tile.dart';
 
-/// Screen 1 - Pantalla principal.
+/// Screen 1 - Inicio.
 ///
-/// Presents the app, explains the problem and leads to the other two
-/// screens. It also lists the vacas calculated during this session.
+/// Greets the user, shows the summary that matters (money still to
+/// collect, open vacas), the sync status and the way into every feature.
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.store});
+  const HomeScreen({
+    super.key,
+    required this.controller,
+    required this.email,
+    required this.onNewVaca,
+    required this.onOpenList,
+    required this.onOpenCobros,
+  });
 
-  final VacaStore store;
+  final VacaSyncController controller;
+  final String? email;
+  final VoidCallback onNewVaca;
+  final VoidCallback onOpenList;
+  final VoidCallback onOpenCobros;
 
-  void _openResults(BuildContext context, String vacaId) =>
-      Navigator.pushNamed(context, Routes.results, arguments: vacaId);
+  /// "ana.diaz@correo.com" -> "ana.diaz".
+  String get _userName => (email ?? '').split('@').first;
 
   @override
   Widget build(BuildContext context) {
-    // Rebuild when a vaca is added, paid or closed.
     return ListenableBuilder(
-      listenable: store,
+      listenable: controller,
       builder: (context, _) {
-        final latest = store.latest;
-        return Scaffold(
-          body: SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        final open = controller.openVacas;
+        final latest = open.isEmpty ? null : open.first;
+        return LargeTitlePage(
+          title: 'Inicio',
+          onRefresh: controller.refresh,
+          bottomPadding: Space.tabBarClearance,
+          children: [
+            _Greeting(name: _userName),
+            const SizedBox(height: Space.m),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SyncStatusBadge(
+                state: controller.state,
+                lastSync: controller.lastSync,
+                onRetry: controller.refresh,
+              ),
+            ),
+            const SizedBox(height: Space.l),
+            _PendingCard(
+              loading: !controller.hasLoaded,
+              pending: controller.totalPending,
+              openCount: open.length,
+              onTap: onOpenCobros,
+            ),
+            const SectionGap(),
+            GroupedSection(
+              header: 'Empezar',
+              separatorInset: 58,
               children: [
-                const _BrandHeader(),
-                const SizedBox(height: 20),
-                const InfoBanner(
-                  icon: Icons.lightbulb_outline,
-                  title: 'El problema',
-                  message:
-                      'Varios amigos comen juntos, uno paga todo y luego pasa semanas cobrando. '
-                      'Muuvelo calcula lo justo para cada uno y te deja marcar quién ya pagó.',
-                ),
-                const SectionHeader('Empezar'),
-                ActionCard(
-                  icon: Icons.add_circle_outline,
+                GroupedRow(
+                  leading: const IconTile(icon: Icon(CupertinoIcons.plus), color: AppColors.tabNew),
                   title: 'Nueva vaca',
-                  subtitle: 'Registra la cuenta, las personas y quién pidió qué',
-                  highlighted: true,
-                  onTap: () => Navigator.pushNamed(context, Routes.register),
+                  subtitle: const Text('Registra la cuenta y quién pidió qué'),
+                  onTap: onNewVaca,
                 ),
-                const SizedBox(height: 12),
-                ActionCard(
-                  icon: Icons.local_drink_outlined,
-                  title: 'Ver resultados',
-                  subtitle: latest == null
-                      ? 'Disponible cuando calcules tu primera vaca'
-                      : 'Última vaca: ${latest.restaurantName}',
-                  // null disables the card while nothing has been calculated.
-                  onTap: latest == null ? null : () => _openResults(context, latest.id),
+                GroupedRow(
+                  leading: const IconTile(icon: Icon(CupertinoIcons.square_stack_3d_up_fill), color: AppColors.tabVacas),
+                  title: 'Mis vacas',
+                  subtitle: Text('${controller.vacas.length} guardadas en tu cuenta'),
+                  onTap: onOpenList,
                 ),
-                SectionHeader(
-                  'Vacas de esta sesión',
-                  trailing: Text('${store.vacas.length}', style: const TextStyle(color: AppColors.muted)),
+                GroupedRow(
+                  leading: const IconTile(icon: Icon(CupertinoIcons.money_dollar), color: AppColors.tabCobros),
+                  title: 'Gestionar cobros',
+                  subtitle: const Text('Marca quién ya pagó y cierra la cuenta'),
+                  onTap: onOpenCobros,
                 ),
-                if (store.isEmpty)
-                  const InfoBanner(
-                    icon: Icons.inbox_outlined,
-                    title: 'Todavía no hay vacas',
-                    message: 'Se guardan solo mientras la app esté abierta.',
-                    color: AppColors.muted,
-                    background: AppColors.border,
-                  ),
-                for (final vaca in store.vacas)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: VacaTile(
-                      title: vaca.restaurantName,
-                      subtitle: '${vaca.participants.length} personas · ${vaca.paidCount} pagaron',
-                      collected: vaca.collected,
-                      total: vaca.total,
-                      percent: vaca.percentCollected,
-                      isClosed: vaca.isClosed,
-                      onTap: () => _openResults(context, vaca.id),
-                    ),
-                  ),
               ],
             ),
-          ),
+            const SectionGap(),
+            if (latest != null)
+              GroupedSection(
+                header: 'Vaca activa',
+                trailingHeader: GestureDetector(
+                  onTap: onOpenList,
+                  child: Text('Ver todas', style: AppText.subheadline.copyWith(color: AppColors.primary)),
+                ),
+                children: [_tileFor(context, latest)],
+              )
+            else if (controller.hasLoaded)
+              GroupedSection(
+                header: 'Vaca activa',
+                children: [
+                  EmptyState(
+                    illustration: 'empty_vacas',
+                    fallback: CupertinoIcons.tray,
+                    title: 'Nada por cobrar',
+                    message: 'Cuando registres una vaca, aquí verás cuánto falta por recoger.',
+                    actionLabel: 'Nueva vaca',
+                    onAction: onNewVaca,
+                  ),
+                ],
+              ),
+            const SectionGap(),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: Space.l),
+              child: Text(
+                'Muuvelo reparte cada ítem entre quienes lo consumieron y la propina en proporción. '
+                'Si sobra un peso por redondeo, lo asume el anfitrión.',
+                style: AppText.footnote,
+              ),
+            ),
+          ],
         );
       },
     );
   }
+
+  Widget _tileFor(BuildContext context, Vaca vaca) => VacaTile(
+    title: vaca.restaurantName,
+    subtitle: '${formatRelativeDay(vaca.createdAt, DateTime.now())} · ${vaca.participants.length} personas',
+    amount: vaca.pending,
+    amountCaption: 'por cobrar',
+    percent: vaca.percentCollected,
+    isClosed: false,
+    statusLabel: 'Abierta · ${vaca.paidCount} de ${vaca.participants.length}',
+    onTap: () => Navigator.pushNamed(context, Routes.detail, arguments: vaca.id),
+  );
 }
 
-/// Logo, app name and tagline. Private because only this screen uses it.
-class _BrandHeader extends StatelessWidget {
-  const _BrandHeader();
+class _Greeting extends StatelessWidget {
+  const _Greeting({required this.name});
+
+  final String name;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // The logo PNG already includes its purple rounded background.
-        Image.asset(
-          'assets/images/logo.png',
-          width: 60,
-          height: 60,
-          semanticLabel: 'Logo de Muuvelo',
+        // App-icon style mark.
+        ClipRRect(
+          borderRadius: Radii.smallAll,
+          child: Image.asset('assets/images/logo.png', width: 44, height: 44, semanticLabel: 'Logo de Muuvelo'),
         ),
-        const SizedBox(width: 14),
-        const Expanded(
+        const SizedBox(width: Space.m),
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Muuvelo',
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppColors.ink),
+                name.isEmpty ? 'Hola' : 'Hola, $name',
+                style: AppText.footnote,
+                overflow: TextOverflow.ellipsis,
               ),
-              Text(
-                'Divide la cuenta por lo que cada uno consumió',
-                style: TextStyle(color: AppColors.muted, fontSize: 14),
-              ),
+              const Text('¿Quién invita hoy?', style: AppText.title2),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Dark card with the most important number of the app: money still to
+/// collect across every open vaca.
+class _PendingCard extends StatelessWidget {
+  const _PendingCard({required this.loading, required this.pending, required this.openCount, required this.onTap});
+
+  final bool loading;
+  final int pending;
+  final int openCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.night,
+      borderRadius: Radii.largeAll,
+      child: InkWell(
+        borderRadius: Radii.largeAll,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(Space.l),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'POR COBRAR',
+                      style: AppText.sectionHeader.copyWith(color: Colors.white.withValues(alpha: 0.7)),
+                    ),
+                    const SizedBox(height: Space.xs),
+                    if (loading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: Space.m),
+                        child: CupertinoActivityIndicator(color: Colors.white),
+                      )
+                    else
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: MoneyText(pending, style: AppText.moneyHero.copyWith(color: Colors.white)),
+                      ),
+                    Text(
+                      openCount == 1 ? 'en 1 vaca abierta' : 'en $openCount vacas abiertas',
+                      style: AppText.subheadline.copyWith(color: Colors.white.withValues(alpha: 0.7)),
+                    ),
+                  ],
+                ),
+              ),
+              const MuuveloIcon('glass_full', size: 56, fallback: CupertinoIcons.chart_pie_fill, color: AppColors.gold),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
